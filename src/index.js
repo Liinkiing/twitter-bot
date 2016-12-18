@@ -17,7 +17,7 @@ switch (process.env.NODE_ENV) {
 let T = new Twit(config);
 
 
-let interval = 120; // Exprimed in seconds
+let interval = 1800; // Exprimed in seconds
 
 let user_to_warn = 'OmarBarrage'; // Put here the user screen name you want to warn when the bot got a response
 let me_id;
