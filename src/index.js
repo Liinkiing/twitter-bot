@@ -31,7 +31,9 @@ let followings = [];
 
 const messages = [
 	`wsh @{0}, @{1} m'a tweeté, inshallah t'as gagné un concours (https://twitter.com/{2}/status/{3})`,
-	`hé @{0}, je crois que @{1} t'as tweeté, t'as peut-être gagné un concours 😱😱😱 (https://twitter.com/{2}/status/{3})`
+	`hé @{0}, je crois que @{1} a tweeté, t'as peut-être gagné un concours 😱😱😱 (https://twitter.com/{2}/status/{3})`,
+	`@{0}, jvoulais te dire que @{1} m'a tweeté. Imagine t'as gagné un concours ? 😍😍 (https://twitter.com/{2}/status/{3})`,
+	`⚠️ @{1} m'a tweeté par rapport à son concours (https://twitter.com/{2}/status/{3}). cc @{0} ⚠️`
 ];
 
 
@@ -49,7 +51,7 @@ T.get('account/verify_credentials')
 		dmstream.on('direct_message', (reponse) => {
 			console.log(reponse.direct_message);
 			postTweet({
-				status: `[${new Date().toLocaleDateString('fr-FR')}, à ${new Date().toLocaleTimeString('fr-FR')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
+				status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
 			});
 		});
 		
