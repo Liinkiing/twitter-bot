@@ -23,11 +23,14 @@ let interval = process.env.INTERVAL || 1800; // Exprimed in seconds
 
 console.log(`Retweet et follow toutes les ${interval}s`);
 
-let user_to_warn = process.env.USER_TO_WARN; // Put here the user screen name you want to warn when the bot got a response
+let user_to_warn = process.env.USER_TO_WARN; // Put here the user mail you want to warn when the bot got a response
 
-console.log(`@${user_to_warn} sera prévenu lorsque je recevrai un tweet ou un DM`);
+console.log(`${user_to_warn} sera prévenu lorsque je recevrai un tweet ou un DM`);
 
 let me_id;
+
+
+
 
 const messages = [
 	`wsh @{0}, @{1} m'a tweeté, inshallah t'as gagné un concours (https://twitter.com/{2}/status/{3})`,
@@ -36,35 +39,66 @@ const messages = [
 	`⚠️ @{1} m'a tweeté par rapport à son concours (https://twitter.com/{2}/status/{3}). cc @{0} ⚠️`
 ];
 
+if(process.env.IS_RUNNING == "true") {
+	T.get('account/verify_credentials')
+		.catch(err => {
+			console.error(err)
+		})
+		.then(response => {
+			
+			let dmstream = T.stream('user', {stringify_friend_ids: true});
+			let homeTimeline = T.stream('user', {stringify_friend_ids: true, with: "followings"});
+			
+			console.log(dmstream);
+			dmstream.on('direct_message', reactToDM);
+			
+			console.log(homeTimeline);
+			homeTimeline.on('tweet', reactToTweet);
+			
+			me_id = response.data.id_str;
+			
+			retweetAndFollow();
+			
+			setInterval(retweetAndFollow, interval * 1000);
+			
+		});
+} else {
+	console.warn("Le bot ne peut pas démarrer car la variable d'environnement 'IS_RUNNING' est réglé à " + process.env.IS_RUNNING);
+}
 
-T.get('account/verify_credentials')
-	.catch(err => {
-		console.error(err)
-	})
-	.then(response => {
-		
-		let dmstream = T.stream('user', {stringify_friend_ids: true});
-		let homeTimeline = T.stream('user', {stringify_friend_ids: true, with: "followings"});
-		
-		console.log(dmstream);
-		dmstream.on('direct_message', reactToDM);
-		
-		console.log(homeTimeline);
-		homeTimeline.on('tweet', reactToTweet);
-		
-		me_id = response.data.id_str;
-		
-		retweetAndFollow();
-		
-		setInterval(retweetAndFollow, interval * 1000);
-		
+
+
+
+function sendMail(to, subject, body) {
+	
+	let helper = require('sendgrid').mail;
+	let from_email = new helper.Email('no-reply@twitter-bot.com');
+	let to_email = new helper.Email(to);
+	let content = new helper.Content('text/html', body);
+	let mail = new helper.Mail(from_email, subject, to_email, content);
+	
+	let sg = require('sendgrid')(process.env.SENDGRID_API_KEY);
+	
+	let request = sg.emptyRequest({
+		method: 'POST',
+		path: '/v3/mail/send',
+		body: mail.toJSON(),
 	});
+	
+	sg.API(request, function(error, response) {
+		console.log(response.statusCode);
+		console.log(response.body);
+		console.log(response.headers);
+	});
+}
+
 
 function reactToDM(reponse) {
 	console.log(reponse.direct_message);
 	postTweet({
 		status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
 	});
+	// sendMail(user_to_warn, `@${reponse.direct_message.sender_screen_name} m'as envoyé un DM !`, `J'ai reçu un DM`);
 }
 
 function reactToTweet(tweet) {
