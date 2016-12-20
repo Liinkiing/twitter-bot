@@ -33,10 +33,18 @@ let me_id;
 
 
 const messages = [
-	`wsh @{0}, @{1} m'a tweeté, inshallah t'as gagné un concours (https://twitter.com/{2}/status/{3})`,
-	`hé @{0}, je crois que @{1} a tweeté, t'as peut-être gagné un concours 😱😱😱 (https://twitter.com/{2}/status/{3})`,
-	`@{0}, jvoulais te dire que @{1} m'a tweeté. Imagine t'as gagné un concours ? 😍😍 (https://twitter.com/{2}/status/{3})`,
-	`⚠️ @{1} m'a tweeté par rapport à son concours (https://twitter.com/{2}/status/{3}). cc @{0} ⚠️`
+	`<a href="https://twitter.com/{0}">@{0}</a> m'a tweeté, inshallah t'as gagné un concours (https://twitter.com/{1}/status/{2})
+	<p>Contenu du tweet : <code style="font-size: 16px;">{3}</code></p>
+`,
+	`Je crois que <a href="https://twitter.com/{0}">@{0}</a> a tweeté, t'as peut-être gagné un concours 😱😱😱 (https://twitter.com/{1}/status/{2})
+	<p>Contenu du tweet : <code style="font-size: 16px;">{3}</code></p>
+`,
+	`J'voulais te dire que <a href="https://twitter.com/{0}">@{0}</a> m'a tweeté. Imagine t'as gagné un concours ? 😍😍 (https://twitter.com/{1}/status/{2})
+	<p>Contenu du tweet : <code style="font-size: 16px;">{3}</code></p>
+`,
+	`⚠️ <a href="https://twitter.com/{0}">@{0}</a> m'a tweeté par rapport à son concours (https://twitter.com/{1}/status/{2}). ⚠️
+	<p>Contenu du tweet : <code style="font-size: 16px;">{3}</code></p>
+`
 ];
 
 if(process.env.IS_RUNNING == "true") {
@@ -95,12 +103,15 @@ function sendMail(to, subject, body) {
 }
 
 
-function reactToDM(reponse) {
-	console.log(reponse.direct_message);
-	postTweet({
-		status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
-	});
-	// sendMail(user_to_warn, `@${reponse.direct_message.sender_screen_name} m'as envoyé un DM !`, `J'ai reçu un DM`);
+function reactToDM(response) {
+	console.log(response.direct_message);
+	// postTweet({
+	// 	status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${response.direct_message.sender_screen_name} m'a laissé un DM !`
+	// });
+	sendMail(user_to_warn, `@${response.direct_message.sender_screen_name} m'a envoyé un DM !`, `
+		<h1>J'ai reçu un message de la part de <a href="https://twitter.com/${response.direct_message.sender_screen_name}">@${response.direct_message.sender_screen_name}</a></h1>
+		<p>[${new Date().toLocaleString('fr')}] - ${response.direct_message.text}</p>
+	`);
 }
 
 function reactToTweet(tweet) {
@@ -110,10 +121,8 @@ function reactToTweet(tweet) {
 			"====== DÉTAILS DU TWEET ======\n");
 		console.log(tweet);
 		console.log("\n============");
-		const newTweet = {
-			status: format(messages[random(messages.length)], user_to_warn, tweet.user.screen_name, tweet.user.id_str, tweet.id_str)
-		};
-		postTweet(newTweet);
+		let message = format(messages[random(messages.length)], tweet.user.screen_name, tweet.user.id_str, tweet.id_str, tweet.text);
+		sendMail(user_to_warn, `@${tweet.user.screen_name} m'a tweeté !`, message);
 	}
 }
 
