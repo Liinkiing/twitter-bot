@@ -63,7 +63,9 @@ if(process.env.IS_RUNNING == "true") {
 			
 		});
 } else {
-	console.warn("Le bot ne peut pas démarrer car la variable d'environnement 'IS_RUNNING' est réglé à " + process.env.IS_RUNNING);
+	setInterval(_ => {
+		console.warn("Le bot ne peut pas démarrer car la variable d'environnement 'IS_RUNNING' est réglé à " + process.env.IS_RUNNING);
+	}, 10 * 1000);
 }
 
 
