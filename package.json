@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/Liinkiing/twitter-bot#readme",
   "dependencies": {
+    "dotenv": "^2.0.0",
     "twit": "latest"
   }
 }

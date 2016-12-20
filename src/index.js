@@ -1,11 +1,8 @@
 "use strict";
 
-function format (fmtstr) {
-	let args = Array.prototype.slice.call(arguments, 1);
-	return fmtstr.replace(/\{(\d+)\}/g, function (match, index) {
-		return args[index];
-	});
-}
+require('dotenv').config();
+
+
 const Twit = require("twit");
 
 let config;
@@ -22,12 +19,15 @@ switch (process.env.NODE_ENV) {
 let T = new Twit(config);
 
 
+let interval = process.env.INTERVAL || 1800; // Exprimed in seconds
 
-let interval = 1800; // Exprimed in seconds
+console.log(`Retweet et follow toutes les ${interval}s`);
 
-let user_to_warn = 'OmarBarrage'; // Put here the user screen name you want to warn when the bot got a response
+let user_to_warn = process.env.USER_TO_WARN; // Put here the user screen name you want to warn when the bot got a response
+
+console.log(`@${user_to_warn} sera prévenu lorsque je recevrai un tweet ou un DM`);
+
 let me_id;
-let followings = [];
 
 const messages = [
 	`wsh @{0}, @{1} m'a tweeté, inshallah t'as gagné un concours (https://twitter.com/{2}/status/{3})`,
@@ -42,59 +42,49 @@ T.get('account/verify_credentials')
 		console.error(err)
 	})
 	.then(response => {
+		
+		let dmstream = T.stream('user', {stringify_friend_ids: true});
+		let homeTimeline = T.stream('user', {stringify_friend_ids: true, with: "followings"});
+		
+		console.log(dmstream);
+		dmstream.on('direct_message', reactToDM);
+		
+		console.log(homeTimeline);
+		homeTimeline.on('tweet', reactToTweet);
+		
 		me_id = response.data.id_str;
 		
 		retweetAndFollow();
-		updateFollowings();
-		let dmstream = T.stream('user', {stringify_friend_ids: true});
-		console.log(dmstream);
-		dmstream.on('direct_message', (reponse) => {
-			console.log(reponse.direct_message);
-			postTweet({
-				status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
-			});
-		});
 		
 		setInterval(retweetAndFollow, interval * 1000);
-		setInterval(updateFollowings, (interval + 60) * 1000);
+		
 	});
 
-
-function updateFollowings() {
-	T.get('friends/ids')
-		.catch((err) => {
-			console.error(err);
-		})
-		.then((response) => {
-			console.log(me_id);
-			followings = response.data.ids;
-			let stream = T.stream('statuses/filter', {follow: followings.join(',')});
-			console.log(stream);
-			stream.on('message', (tweet) => {
-				if (isRetweet(tweet)) console.log("Détails du tweet ommis car il s'agissait d'un RT. ('" + tweet.text + "')");
-				else {
-					if (isAReplyTo(tweet, me_id)) {
-						console.log("@" + tweet.user.screen_name + " vous a tweeté ! Peut-être avez-vous gagné un concours :o \n\n" +
-							"====== DÉTAILS DU TWEET ======\n");
-						console.log(tweet);
-						console.log("\n============");
-						const newTweet = {
-							status: format(messages[random(messages.length)], user_to_warn, tweet.user.screen_name, tweet.user.id_str, tweet.id_str)
-						};
-						postTweet(newTweet);
-					}
-				}
-			});
-			
-		});
+function reactToDM(reponse) {
+	console.log(reponse.direct_message);
+	postTweet({
+		status: `[${new Date().toLocaleString('fr')}] - Hey @${user_to_warn}, @${reponse.direct_message.sender_screen_name} m'a laissé un DM !`
+	});
 }
 
+function reactToTweet(tweet) {
+	if (isRetweet(tweet)) console.log("Détails du tweet ommis car il s'agissait d'un RT. ('" + tweet.text + "')");
+	else if (!isRetweet(tweet) && isAReplyTo(tweet, me_id)) {
+		console.log("@" + tweet.user.screen_name + " vous a tweeté ! Peut-être avez-vous gagné un concours :o \n\n" +
+			"====== DÉTAILS DU TWEET ======\n");
+		console.log(tweet);
+		console.log("\n============");
+		const newTweet = {
+			status: format(messages[random(messages.length)], user_to_warn, tweet.user.screen_name, tweet.user.id_str, tweet.id_str)
+		};
+		postTweet(newTweet);
+	}
+}
 
 function retweetAndFollow() {
 	T.get('search/tweets', {
 		q: 'Concours RT + Follow',
-		count: 20,
-		result_type: 'popular'
+		count: 30
 	}, (err, data, response) => {
 		console.log(data.search_metadata);
 		let i = 0;
@@ -102,20 +92,28 @@ function retweetAndFollow() {
 			i += 2000;
 			setTimeout(_ => {
 				console.log(tweet.text + "\n\n----------\n\n");
-				if (followings.length > 0 && followings.includes(tweet.user.id)) {
-					console.log('Vous followez déjà @' + tweet.user.screen_name);
+				if (isRetweet(tweet)) {
+					if (tweet.retweeted_status.user.following) {
+						console.log('Vous followez déjà @' + tweet.retweeted_status.user.screen_name);
+					} else {
+						console.log('Vous ne followez pas @' + tweet.retweeted_status.user.screen_name);
+						retweet(tweet.retweeted_status);
+						followFromTweet(tweet.retweeted_status);
+					}
 				} else {
-					console.log('Vous ne followez pas @' + tweet.user.screen_name);
-					retweet(tweet);
-					followFromTweet(tweet);
+					if (tweet.user.following) {
+						console.log('Vous followez déjà @' + tweet.user.screen_name);
+					} else {
+						console.log('Vous ne followez pas @' + tweet.user.screen_name);
+						retweet(tweet);
+						followFromTweet(tweet);
+					}
+					
 				}
 			}, i);
 		});
 	});
 }
-
-
-
 
 function isRetweet(tweet) {
 	return "retweeted_status" in tweet;
@@ -151,11 +149,43 @@ function retweet(tweet, errorHandle, responseHandle) {
 }
 
 function followFromTweet(tweet, errorHandle, responseHandle) {
-	T.post('friendships/create', {screen_name: tweet.retweeted ? tweet.retweeted_status.user.screen_name : tweet.user.screen_name})
+	if(isRetweet(tweet)){
+		if("user_mentions" in tweet.retweeted_status.entities && tweet.retweeted_status.entities.user_mentions.length > 0) {
+			for(let user of tweet.retweeted_status.entities.user_mentions) {
+				console.log(user);
+				follow(user.screen_name);
+			}
+		} else {
+			let userToFollow = tweet.retweeted ? tweet.retweeted_status.user.screen_name : tweet.user.screen_name;
+			follow(userToFollow);
+		}
+	} else {
+		if("user_mentions" in tweet.entities && tweet.entities.user_mentions.length > 0) {
+			for(let user of tweet.entities.user_mentions) {
+				console.log(user);
+				follow(user.screen_name);
+			}
+		} else {
+			let userToFollow = tweet.retweeted ? tweet.retweeted_status.user.screen_name : tweet.user.screen_name;
+			follow(userToFollow);
+		}
+	}
+	
+}
+
+function follow(username, errorHandle, responseHandle) {
+	T.post('friendships/create', {screen_name: username})
 		.catch(err => {
 			if (errorHandle) errorHandle(err); else console.log(err);
 		})
 		.then(response => {
-			if (responseHandle) responseHandle(response); else console.log(`Vous avez bien follow @${tweet.user.screen_name}\n`)
+			if (responseHandle) responseHandle(response); else console.log(`Vous avez bien follow @${username}\n`)
 		});
+}
+
+function format(fmtstr) {
+	let args = Array.prototype.slice.call(arguments, 1);
+	return fmtstr.replace(/\{(\d+)\}/g, function (match, index) {
+		return args[index];
+	});
 }
